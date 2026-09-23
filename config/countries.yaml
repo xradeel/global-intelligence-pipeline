@@ -13,3 +13,38 @@ countries:
     code: IND
     latitude: 20.5937
     longitude: 78.9629
+
+  - name: United States
+    code: USA
+    latitude: 37.0902
+    longitude: -95.7129
+
+  - name: Germany
+    code: DEU
+    latitude: 51.1657
+    longitude: 10.4515
+
+  - name: United Kingdom
+    code: GBR
+    latitude: 55.3781
+    longitude: -3.4360
+
+  - name: China
+    code: CHN
+    latitude: 35.8617
+    longitude: 104.1954
+
+  - name: Japan
+    code: JPN
+    latitude: 36.2048
+    longitude: 138.2529
+
+  - name: Brazil
+    code: BRA
+    latitude: -14.2350
+    longitude: -51.9253
+
+  - name: Australia
+    code: AUS
+    latitude: -25.2744
+    longitude: 133.7751
