@@ -3,6 +3,7 @@ from airflow.sdk import dag, task
 
 from src.clients.rest_countries import RestCountriesClient
 from src.clients.open_meteo import OpenMeteoClient
+from src.clients.world_bank import WorldBankClient
 from src.utils.save_raw_data import SaveRawData
 
 
@@ -35,10 +36,21 @@ def global_intelligence():
 
         save_res.json(res, path)
         return path
+
+    @task
+    def fetch_world_economics(country_code="PAK"):
+        client = WorldBankClient()
+        res = client.call(country_code)
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        path = f'data/raw/worldbank/{current_date}.json'
+
+        save_res.json(res, path)
+        return path
     
 
 
     country = fetch_countries('canada')
     weather = fetch_weather()
+    economics = fetch_world_economics()
 
 global_intelligence()
