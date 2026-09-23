@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class RestCountriesClient:
-    def call(country='canada'):
+    def call(self, country='canada'):
 
         base_url = os.environ.get("REST_COUNTRIES_BASE_URL")
         endpoint = f"{base_url}/countries/v5?q={country}"
@@ -14,9 +14,5 @@ class RestCountriesClient:
             endpoint,
             headers={'Authorization': f'Bearer {api_key}'}
         )
-        print(response.json())
-        return
+        return response.json()
 
-
-
-RestCountriesClient.call("pakistan")
