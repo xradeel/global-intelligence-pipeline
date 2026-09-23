@@ -4,6 +4,7 @@ from airflow.sdk import dag, task
 from src.clients.rest_countries import RestCountriesClient
 from src.clients.open_meteo import OpenMeteoClient
 from src.clients.world_bank import WorldBankClient
+from src.clients.gdelt import GdeltClient
 from src.utils.save_raw_data import SaveRawData
 
 
@@ -46,11 +47,21 @@ def global_intelligence():
 
         save_res.json(res, path)
         return path
-    
+
+    @task
+    def fetch_news(country="Pakistan"):
+        client = GdeltClient()
+        res = client.call(country)
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        path = f'data/raw/news/{current_date}.json'
+
+        save_res.json(res, path)
+        return path
 
 
     country = fetch_countries('canada')
     weather = fetch_weather()
     economics = fetch_world_economics()
+    news = fetch_news()
 
 global_intelligence()
