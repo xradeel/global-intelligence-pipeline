@@ -1,0 +1,15 @@
+countries:
+  - name: Pakistan
+    code: PAK
+    latitude: 30.3753
+    longitude: 69.3451
+
+  - name: France
+    code: FRA
+    latitude: 46.2276
+    longitude: 2.2137
+
+  - name: India
+    code: IND
+    latitude: 20.5937
+    longitude: 78.9629
