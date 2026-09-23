@@ -2,6 +2,7 @@ from datetime import datetime
 from airflow.sdk import dag, task
 
 from src.clients.rest_countries import RestCountriesClient
+from src.clients.open_meteo import OpenMeteoClient
 from src.utils.save_raw_data import SaveRawData
 
 
@@ -25,7 +26,19 @@ def global_intelligence():
         save_res.json(res, path)
         return path
 
+    @task
+    def fetch_weather(latitude=31.5204, longitude=74.3587):
+        client = OpenMeteoClient()
+        res = client.call(latitude, longitude)
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        path = f'data/raw/weather/{current_date}.json'
+
+        save_res.json(res, path)
+        return path
+    
+
 
     country = fetch_countries('canada')
+    weather = fetch_weather()
 
 global_intelligence()
