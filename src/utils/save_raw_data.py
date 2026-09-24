@@ -11,3 +11,5 @@ class SaveRawData:
 
         with open(path, "w") as file:
             json.dump(data, file, indent=2)
+
+        return path
