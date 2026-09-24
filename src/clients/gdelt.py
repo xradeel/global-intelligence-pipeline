@@ -1,40 +1,64 @@
-import os
+import io
+import zipfile
+import pandas as pd
 import requests
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
 class GdeltClient:
 
+  LAST_UPDATE_URL = "http://data.gdeltproject.org/gdeltv2/lastupdate.txt"
+
   def call(self, country: str = "Pakistan"):
-    base_url = os.environ.get(
-        "GDELT_BASE_URL", "https://api.gdeltproject.org"
-    ).rstrip("/")
-    endpoint = f"{base_url}/api/v2/doc/doc"
+    # 1. Fetch the manifest of the latest 15-minute export
+    resp = requests.get(self.LAST_UPDATE_URL, timeout=15)
+    resp.raise_for_status()
 
-    params = {
-        "query": country,
-        "mode": "artlist",
-        "format": "json",
-        "maxrecords": 50,
-    }
+    # The export URL is the first line of the manifest
+    # Format: <size> <hash> <url>
+    lines = resp.text.strip().split("\n")
+    export_url = lines[0].split()[2]
 
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-            " (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
-        ),
-        "Accept": "application/json",
-    }
+    # 2. Download and unzip the CSV in-memory
+    zip_resp = requests.get(export_url, timeout=30)
+    zip_resp.raise_for_status()
 
-    response = requests.get(
-        endpoint, params=params, headers=headers, timeout=20
-    )
-    response.raise_for_status()
+    with zipfile.ZipFile(io.BytesIO(zip_resp.content)) as z:
+      csv_filename = z.namelist()[0]
+      with z.open(csv_filename) as f:
+        # Columns from GDELT 2.0 Event format
+        df = pd.read_csv(
+            f,
+            sep="\t",
+            header=None,
+            usecols=[1, 6, 53, 57],
+            names=[
+                "date",
+                "actor_country",
+                "source_country",
+                "source_url",
+            ],
+            dtype=str,
+        )
 
-    text = response.text.strip()
-    if not text:
-      return {"articles": []}
+    # 3. Filter for country mentions/events
+    match = df[
+        (df["actor_country"].str.contains(country[:3].upper(), na=False))
+        | (df["source_country"].str.contains(country[:3].upper(), na=False))
+    ].head(50)
 
-    return response.json()
+    articles = []
+    for _, row in match.iterrows():
+      articles.append({
+          "url": row["source_url"],
+          "title": f"Event involving {country}",
+          "source_country": row["source_country"],
+          "published_at": str(row["date"]),
+          "language": "en",
+          "domain": (
+              row["source_url"].split("/")[2]
+              if pd.notna(row["source_url"])
+              else None
+          ),
+      })
+
+    return {"articles": articles}

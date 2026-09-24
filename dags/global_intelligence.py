@@ -6,8 +6,13 @@ from src.clients.open_meteo import OpenMeteoClient
 from src.clients.world_bank import WorldBankClient
 from src.clients.gdelt import GdeltClient
 
-from src.validation.response import validate_json_list_file
-from src.utils.save_raw_data import SaveRawData
+from src.validations.response import validate_json_list_file
+from src.transformations.countries import TransformCountries
+from src.transformations.news import TransformNews
+from src.transformations.weather import TransformWeather
+from src.transformations.worldbank import TransformWorldBank
+from src.loaders.warehouse import WarehouseLoader
+from src.utils.save_data import SaveRawData
 
 
 @dag(
@@ -18,6 +23,7 @@ from src.utils.save_raw_data import SaveRawData
 )
 def global_intelligence():
     save_res = SaveRawData()
+    loader = WarehouseLoader()
 
     @task
     def fetch_countries(country="pakistan"):
@@ -65,24 +71,102 @@ def global_intelligence():
         return path
 
     @task
-    def validate_responses(
-        country_path: str, weather_path: str, economics_path: str, news_path: str
-    ):
-        return {
+    def validate_responses(country_path, weather_path, economics_path, news_path):
+        validations = {
             "country": validate_json_list_file(country_path),
             "weather": validate_json_list_file(weather_path),
             "economics": validate_json_list_file(economics_path),
             "news": validate_json_list_file(news_path),
         }
 
-    # Fetch tasks
-    country = fetch_countries("canada")
-    weather = fetch_weather()
-    economics = fetch_world_economics()
-    news = fetch_news()
+        failed_checks = [
+            k for k, v in validations.items() if not v[0]
+        ]
+        if failed_checks:
+            raise ValueError(f"Validation failed for datasets: {failed_checks}")
 
-    # TaskFlow automatically configures the 4 fetch tasks as upstream of validate_responses
-    validate_responses(country, weather, economics, news)
+        return validations
+
+    # Transformations
+
+    @task
+    def transform_country(raw_path: str) -> str:
+        transformed_data = TransformCountries().transform_country_file(raw_path)
+        processed_path = raw_path.replace("data/raw/", "data/processed/")
+
+        save_res.json(transformed_data, processed_path)
+        return processed_path
+
+    @task
+    def transform_weather(raw_path: str) -> str:
+        transformed_data = TransformWeather().transform_weather_file(raw_path)
+        processed_path = raw_path.replace("data/raw/", "data/processed/")
+
+        save_res.json(transformed_data, processed_path)
+        return processed_path
+
+    @task
+    def transform_economics(raw_path: str) -> str:
+        transformed_data = TransformWorldBank().transform_world_bank_file(raw_path)
+        processed_path = raw_path.replace("data/raw/", "data/processed/")
+
+        save_res.json(transformed_data, processed_path)
+        return processed_path
+
+    @task
+    def transform_news(raw_path: str) -> str:
+        transformed_data = TransformNews().transform_gdelt_file(raw_path)
+        processed_path = raw_path.replace("data/raw/", "data/processed/")
+
+        save_res.json(transformed_data, processed_path)
+        return processed_path
+
+    # Loaders
+
+    @task
+    def load_country(processed_path: str):
+        return loader.load_country(processed_path)
+
+    @task
+    def load_weather(processed_path: str, country_code="PAK"):
+        return loader.load_weather(processed_path, country_code=country_code)
+
+    @task
+    def load_economics(processed_path: str):
+        return loader.load_economics(processed_path)
+
+    @task
+    def load_news(processed_path: str, country_code="PAK"):
+        return loader.load_news(processed_path, target_country_code=country_code)
+
+    # Fetch tasks
+    country_raw = fetch_countries("canada")
+    weather_raw = fetch_weather()
+    economics_raw = fetch_world_economics("PAK")
+    news_raw = fetch_news("France")
+
+    is_valid = validate_responses(
+        country_raw, weather_raw, economics_raw, news_raw
+    )
+
+    # Transform tasks
+    country_processed = transform_country(country_raw)
+    weather_processed = transform_weather(weather_raw)
+    economics_processed = transform_economics(economics_raw)
+    news_processed = transform_news(news_raw)
+
+    is_valid >> [
+        country_processed,
+        weather_processed,
+        economics_processed,
+        news_processed,
+    ]
+
+    # Load tasks
+    load_country(country_processed)
+    load_weather(weather_processed)
+    load_economics(economics_processed)
+    load_news(news_processed)
 
 
 global_intelligence()

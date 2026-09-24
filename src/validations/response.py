@@ -20,7 +20,7 @@ def validate_json_list_file(
     except (OSError, UnicodeDecodeError) as e:
         return False, f"Could not read file: {e}"
 
-    if not isinstance(data, list) or isinstance(data, dict):
+    if not isinstance(data, (list, dict)):
         return (
             False,
             f"Expected a JSON list/array, but found: {type(data).__name__}",
